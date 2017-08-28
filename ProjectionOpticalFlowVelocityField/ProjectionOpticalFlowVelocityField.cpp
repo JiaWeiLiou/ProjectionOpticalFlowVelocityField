@@ -20,8 +20,8 @@ int main()
 {
 	string infile;
 	cout << "Please enter video path : ";
-	//cin >> infile;
-	infile = "C:\\Users\\Jimmy\\Desktop\\流速分析\\20160613093400_04_cut.avi";   //test
+	cin >> infile;
+	//infile = "C:\\Users\\Jimmy\\Desktop\\流速分析\\testvideo.avi";   //test
 
 	/*確認檔案是否存在*/
 	VideoCapture video(infile); // open the default camera
@@ -34,10 +34,10 @@ int main()
 
 	std::cout << "Whether to use the default output ((0) N (1) Y ) : ";
 	bool default;
-	//cin >> default;
-	default = 1; //test
+	cin >> default;
+	//default = 1; //test
 
-	double lowerbound = 0, upperbound = 7;
+	double lowerbound = 0, upperbound = 10;
 	int indexNum = 10;
 	string unit = "(m/s)";
 
@@ -128,9 +128,9 @@ int main()
 	colorbar.index = colorbar.indexString(upperbound, lowerbound, indexNum);		//刻度上界、下界、刻度數量
 	colorbar.unit = unit;
 	colorbar.length = newWarpFrame.rows;
-	Mat colorbarImg =colorbar.makeColorbar(0);
+	Mat colorbarImg = colorbar.makeColorbar(0);
 
-	Mat ImageCombine(newWarpFrame.rows, newWarpFrame.cols + colorbarImg.cols + colorbarImg.cols/10, newWarpFrame.type(),Scalar(255,255,255));
+	Mat ImageCombine(newWarpFrame.rows, newWarpFrame.cols + colorbarImg.cols + colorbarImg.cols / 10, newWarpFrame.type(), Scalar(255, 255, 255));
 	Mat LeftImage = ImageCombine(Rect(0, 0, newWarpFrame.cols, newWarpFrame.rows));
 	Mat RightImage = ImageCombine(Rect(newWarpFrame.cols + colorbarImg.cols / 10, 0, colorbarImg.cols, colorbarImg.rows));
 	colorbarImg.copyTo(RightImage);
@@ -153,7 +153,7 @@ int main()
 
 		/*Farneback光流法計算*/
 		calcOpticalFlowFarneback(prevWarpGray, newWarpGray, flow, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma, flags);
-		
+
 		/*繪製速度場*/
 		Mat velocityImg = drawJetColorSystem(flow, 16, upperbound, lowerbound, fps);
 		velocityImg.copyTo(LeftImage);
@@ -214,7 +214,7 @@ Mat drawJetColorSystem(const Mat& flow, double realSize, double upperbound, doub
 		for (int x = 0; x < flow.cols; ++x)
 		{
 			uchar *data = velocityFieldImg.data + velocityFieldImg.step[0] * y + velocityFieldImg.step[1] * x;
-			const Point2f& fxy = flow.at<Point2f>(y, x);
+			const Point2f &fxy = flow.at<Point2f>(y, x);
 			double velocity = (double)sqrt(pow(fxy.x, 2) + pow(fxy.y, 2))*fps*realSize / pixelSize;
 
 			if (velocity <= lowerbound)
@@ -224,7 +224,7 @@ Mat drawJetColorSystem(const Mat& flow, double realSize, double upperbound, doub
 				data[2] = 0;
 				continue;
 			}
-			else if(velocity >= upperbound)
+			else if (velocity >= upperbound)
 			{
 				data[0] = 0;
 				data[1] = 0;
@@ -232,20 +232,17 @@ Mat drawJetColorSystem(const Mat& flow, double realSize, double upperbound, doub
 				continue;
 			}
 
-			double fk = (velocity - lowerbound) / (upperbound - lowerbound)* (colorbarIndex.size() - 1);  //計算角度對應之索引位置;
+			double fk = (velocity - lowerbound) / (upperbound - lowerbound)* (colorbarIndex.size() - 1);  //計算速度對應之索引位置;
 			int k0 = (int)fk;
 			int k1 = k0 + 1;
 			double f = fk - k0;
-
-			//cout << velocity << endl;
-			//cout << fk << endl;
 
 			for (int b = 0; b < 3; b++)
 			{
 				double col0 = colorbarIndex[k0][b] / 255.0;
 				double col1 = colorbarIndex[k1][b] / 255.0;
 				double col = (1 - f) * col0 + f * col1;
-				velocityFieldImg.at<Vec3b>(y, x)[2 - b] = (int)(255 * col);
+				data[2 - b] = (int)(255.0 * col);
 			}
 		}
 	}
