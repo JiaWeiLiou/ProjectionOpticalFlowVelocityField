@@ -76,8 +76,10 @@ int main()
 	timeStart = clock();
 
 	/*轉換前後座標*/
-	Point2f beforept[4] = { Point2f(433,248),Point2f(652,248),Point2f(321,474),cv::Point2f(132,351) };
-	Point2f afterpt[4] = { Point2f(0,0),Point2f(200,0),Point2f(200,400),cv::Point2f(0,400) }; //像素座標系
+	//Point2f beforept[4] = { Point2f(433,248),Point2f(652,248),Point2f(321,474),cv::Point2f(132,351) };
+	//Point2f afterpt[4] = { Point2f(0,0),Point2f(200,0),Point2f(200,400),cv::Point2f(0,400) }; //像素座標系
+	Point2f beforept[4] = { Point2f(767,267),Point2f(1463,307),Point2f(1595,977),cv::Point2f(569,900) };
+	Point2f afterpt[4] = { Point2f(0,0),Point2f(660,0),Point2f(660,660),cv::Point2f(0,660) };
 	Size aftersize = Size(afterpt[2].x, afterpt[2].y);
 
 	/*透視投影轉換*/
@@ -155,7 +157,7 @@ int main()
 		calcOpticalFlowFarneback(prevWarpGray, newWarpGray, flow, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma, flags);
 
 		/*繪製速度場*/
-		Mat velocityImg = drawJetColorSystem(flow, 16, upperbound, lowerbound, fps);
+		Mat velocityImg = drawJetColorSystem(flow, 0.6, upperbound, lowerbound, fps);
 		velocityImg.copyTo(LeftImage);
 
 		writer.write(ImageCombine);
