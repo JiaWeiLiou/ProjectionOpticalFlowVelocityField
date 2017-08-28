@@ -12,48 +12,62 @@
 using namespace std;
 using namespace cv;
 
+Colorbar colorbar;
+vector<Scalar> colorbarIndex = colorbar.makeColorbarColorIndex();
 
-void outputVelocity(const Mat& flow, double realSize, ofstream &ofile, double fps)
-{
-	double velocity;
-	double pixelSize = flow.rows;
-	int i, j;
-	//for (int y = -1; y < flow.rows; y += step)
-	//{
-
-	//	for (int x = -1; x < flow.cols; x += step)
-	//	{
-	for (int y = 0; y < flow.rows; y ++)
-	{
-
-		for (int x = 0; x < flow.cols; x ++)
-		{
-			//i = x == -1 ? 0 : x;
-			//j = y == -1 ? 0 : y;
-			//const Point2f& fxy = flow.at<Point2f>(j, i);
-			const Point2f& fxy = flow.at<Point2f>(y, x);
-			velocity = sqrt(pow(fxy.x, 2) + pow(fxy.y, 2))*fps*realSize / pixelSize;
-			ofile << velocity << "\t";
-		}
-		ofile << endl;
-	}
-	ofile << endl;
-}
+Mat drawJetColorSystem(const Mat& flow, double realSize, double upperbound, double lowerbound, double fps);
 
 int main()
 {
 	string infile;
-	string outfile, outfile2, outfile3;
 	cout << "Please enter video path : ";
 	cin >> infile;
 
 	/*確認檔案是否存在*/
-	VideoCapture cap(infile); // open the default camera
-	if (!cap.isOpened())  // check if we succeeded
+	VideoCapture video(infile); // open the default camera
+	if (!video.isOpened())  // check if we succeeded
 	{
 		cout << "Error opening Video !" << endl;
 		system("pause");
 		return -1;
+	}
+
+	std::cout << "Whether to use the default output ((0) N (1) Y ) : ";
+	bool default;
+	cin >> default;
+
+	double lowerbound = 0, upperbound = 5;
+	int indexNum = 10;
+	string unit = "m/s";
+
+	if (!default)
+	{
+		/*設定Jet Colorbar 的上下界*/
+		std::cout << "Please enter output of Jet Colorbar's lowerbound and Upperbound : ";
+		std::cout << "lowerbound : ";
+		cin >> lowerbound;
+		std::cout << "upperbound : ";
+		cin >> upperbound;
+		if (lowerbound < 0 || upperbound < 0 || lowerbound > 100 || upperbound >100)
+		{
+			std::cout << "Error Input !" << endl;
+			std::cout << "Default output of Jet Colorbar's lowerbound = 0 and Upperbound = 10";
+			lowerbound = 0;
+			upperbound = 10;
+		}
+
+		std::cout << "Please enter output of Jet Colorbar's index number (<12) : ";
+		cin >> indexNum;
+		if (indexNum < 0 || indexNum > 11)
+		{
+			std::cout << "Error Input !" << endl;
+			std::cout << "Default output of index = 10";
+			indexNum = 10;
+		}
+
+		std::cout << "Please enter output of Jet Colorbar's index unit (ex.(m/s)) : ";
+		unit.clear();
+		cin >> unit;
 	}
 
 	/*計算程式執行時間*/
@@ -61,112 +75,129 @@ int main()
 	timeStart = clock();
 
 	/*轉換前後座標*/
-	//Point2f beforept[4] = { Point2f(767,267),Point2f(1463,307),Point2f(1595,977),cv::Point2f(569,900) };
-	//Point2f afterpt[4] = { Point2f(0,0),Point2f(660,0),Point2f(660,660),cv::Point2f(0,660) };
-	//Size aftersize = Size(afterpt[2].x, afterpt[2].y);
+	Point2f beforept[4] = { Point2f(767,267),Point2f(1463,307),Point2f(1595,977),cv::Point2f(569,900) };
+	Point2f afterpt[4] = { Point2f(0,0),Point2f(660,0),Point2f(660,660),cv::Point2f(0,660) };
+	Size aftersize = Size(afterpt[2].x, afterpt[2].y);
 
-	//修改文件名
+	/*透視投影轉換*/
+	Mat perspective_matrix = getPerspectiveTransform(beforept, afterpt);
+
+	/*設定輸出文件名*/
+	string outfile;
 	int pos1 = infile.find_last_of('/\\');
 	int pos2 = infile.find_last_of('.');
 	string filepath(infile.substr(0, pos1));
 	string infile_name(infile.substr(pos1 + 1, pos2 - pos1 - 1));
-	outfile = filepath + "\\" + infile_name + "_direction.avi";
-	outfile2 = filepath + "\\" + infile_name + "_projectioncolor.avi";
-	outfile3 = filepath + "\\" + infile_name + "_velocity.txt";
+	outfile = filepath + "\\" + infile_name + "_VelocityField.avi";
 
-	Mat newFrame, newGray, newGray_temp, newGray_temp_temp, prevGray, warpFrame, thresholdFrame;
+	/*獲取第一幀影像*/
+	Mat newFrame, newWarpFrame;
+	video >> newFrame;
+	cv::warpPerspective(newFrame, newWarpFrame, perspective_matrix, aftersize);
 
-	Mat motion2color;
+	/*將彩色影像轉換為灰階並設定為第一幀*/
+	Mat newWarpGray, prevWarpGray;
+	cv::cvtColor(newWarpFrame, newWarpGray, CV_BGR2GRAY);
+	prevWarpGray = newWarpGray.clone();
 
-	cap >> newFrame; // get a new frame from camera
-	
-
-	/*透視投影轉換*/
-	//Mat perspective_matrix = getPerspectiveTransform(beforept, afterpt);
-	//warpPerspective(newFrame, warpFrame, perspective_matrix, aftersize);
-
-	cvtColor(newFrame, newGray, CV_BGR2GRAY);
-
-	prevGray = newGray.clone();
-
+	/*設定Farneback光流法參數*/
 	double pyr_scale = 0.5;
 	int levels = 3;
 	int winsize = 9;
-	int iterations = 5;
+	int iterations = 7;
 	int poly_n = 5;
 	double poly_sigma = 1.1;
 	int flags = OPTFLOW_USE_INITIAL_FLOW;
+	double fps = video.get(CV_CAP_PROP_FPS);   //獲取影片幀率
 
-	double fps = cap.get(CV_CAP_PROP_FPS);
-	fps = 5.9;
+	/*輸出影片基本資訊*/
+	std::cout << "Video's frame width  : " << video.get(CV_CAP_PROP_FRAME_WIDTH) << " pixel" << endl;
+	std::cout << "Video's frame height : " << video.get(CV_CAP_PROP_FRAME_HEIGHT) << " pixel" << endl;
+	std::cout << "Video's total frames : " << video.get(CV_CAP_PROP_FRAME_COUNT) << " frames" << endl;
+	std::cout << "Video's frame rate   : " << fps << " FPS" << endl;
 
-	//VideoWriter writer = VideoWriter(outfile, CV_FOURCC('D', 'I', 'V', 'X'), fps, newGray.size());
-	VideoWriter colorWriter = VideoWriter(outfile, CV_FOURCC('D', 'I', 'V', 'X'), fps, Size(newFrame.cols*2, newFrame.rows));
-	
-	ofstream ofile(outfile3,ios::out);
+	std::cout << endl << "Start calculate ..." << endl;
 
-	int test = 0;
-	Mat flow = Mat(newGray.size(), CV_32FC2);
-	Mat warpflow = Mat(newGray.size(), CV_32FC2);
-	Mat oldFlow = Mat(newGray.size(), CV_32FC2);
+	int frameNum = 1;
+	std::cout << endl << "No. " << frameNum << "\t";
+
+
+	/*創建Jet Colorbar*/
+	vector<string> index = colorbar.indexString(upperbound, lowerbound, indexNum);		//刻度上界、下界、刻度數量
+	Mat colorbarImg =colorbar.makeColorbar(newWarpFrame.rows, index, unit, 0);
+
+	Mat ImageCombine(newWarpFrame.rows, newWarpFrame.cols + colorbarImg.cols + colorbarImg.cols/100, newWarpFrame.type());
+	Mat LeftImage = ImageCombine(Rect(0, 0, newWarpFrame.cols, newWarpFrame.rows));
+	Mat RightImage = ImageCombine(Rect(newWarpFrame.cols + colorbarImg.cols / 100, 0, colorbarImg.cols, colorbarImg.rows));
+	colorbarImg.copyTo(RightImage);
+
+	/*創建輸出影片物件*/
+	VideoWriter writer = VideoWriter(outfile, CV_FOURCC('D', 'I', 'V', 'X'), fps, Size(ImageCombine.size()));
+
+	/*光流場*/
+	Mat flow = Mat(newWarpFrame.size(), CV_32FC2);
 
 	while (1)
 	{
-		++test;
-
-		cap >> newFrame;
-
+		video >> newFrame;
 		if (newFrame.empty()) break;
-		//warpPerspective(newFrame, warpFrame, perspective_matrix, aftersize);
-		cvtColor(newFrame, newGray, CV_BGR2GRAY);
+		cv::warpPerspective(newFrame, newWarpFrame, perspective_matrix, aftersize);
+		cv::cvtColor(newWarpFrame, newWarpGray, CV_BGR2GRAY);
+		prevWarpGray = newWarpGray.clone();
 
-		//threshold(newGray, newGray_temp, 175, 255, THRESH_TOZERO);
-		//warpPerspective(newGray_temp, thresholdFrame, perspective_matrix, aftersize);
+		frameNum++;
+		cout << frameNum << "\t";
 
 		/*Farneback光流法計算*/
-		calcOpticalFlowFarneback(prevGray, newGray, flow, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma, flags);
-		//warpPerspective(flow, warpflow, perspective_matrix, aftersize);
+		calcOpticalFlowFarneback(prevWarpGray, newWarpGray, flow, pyr_scale, levels, winsize, iterations, poly_n, poly_sigma, flags);
 		
-		outputVelocity(flow, 16, ofile, fps);
-		
-		if (test == 1)
-			drawOptFlowMap(flow, newFrame, 20, CV_RGB(255, 0, 0));
-		drawOptFlowMap(oldFlow, flow, newFrame, 20, CV_RGB(255, 0, 0));
+		/*繪製速度場*/
+		Mat velocityImg = drawJetColorSystem(flow, 16, upperbound, lowerbound, fps);
+		velocityImg.copyTo(LeftImage);
 
-		motionToColor(flow, motion2color);
+		writer.write(ImageCombine);
 
-
-
-		Mat colorCombine(motion2color.rows, motion2color.cols + newFrame.cols, motion2color.type());
-		Mat imageROI,imageROI2;
-		imageROI = colorCombine(Rect(0, 0, newFrame.cols, newFrame.rows));
-		imageROI2 = colorCombine(Rect(newFrame.cols, 0, motion2color.cols, motion2color.rows));
-		newFrame.copyTo(imageROI);
-		motion2color.copyTo(imageROI2);
-
-		/*儲存計算結果*/
-		//writer.write(newFrame);
-		colorWriter.write(colorCombine);
-
-		//namedWindow("Output", WINDOW_NORMAL);
-		//if (newGray.cols >= 1366 || newGray.rows >= 768)
-		//	resizeWindow("Output", round(newGray.cols / 2), round(newGray.rows / 2));
-		//imshow("Output", newGray);
-		//waitKey(0);
-
-		prevGray = newGray.clone();
-		oldFlow = flow;
-
-		////test
-		//if (test == 100)
-		//{
-		//	system("pause");
-		//}
+		prevWarpGray = newWarpGray.clone();
 
 	}
 
-	//timeEnd = clock();
-	//cout << "total time = " << (timeEnd - timeStart) / CLOCKS_PER_SEC << " s" << endl;
-	//system("pause");
+	timeEnd = clock();
+	std::cout << endl << "total time = " << (timeEnd - timeStart) / CLOCKS_PER_SEC << " s" << endl;
+
 	return 0;
+}
+
+Mat drawJetColorSystem(const Mat& flow, double realSize, double upperbound, double lowerbound, double fps)
+{
+	Mat velocityFieldImg(flow.rows, flow.cols, CV_8UC3, Scalar(0, 0, 0));
+	double pixelSize = flow.rows;
+	for (int y = 0; y < flow.rows; ++y)
+	{
+		for (int x = 0; x < flow.cols; ++x)
+		{
+			uchar *data = velocityFieldImg.data + velocityFieldImg.step[0] * y + velocityFieldImg.step[1] * x;
+			const Point2f& fxy = flow.at<Point2f>(y, x);
+			double velocity = (double)sqrt(pow(fxy.x, 2) + pow(fxy.y, 2))*fps*realSize / pixelSize;
+			double fk = (velocity - lowerbound) / (upperbound - lowerbound)* (colorbarIndex.size() - 1);  //計算角度對應之索引位置;
+			int k0 = (int)fk;
+			int k1 = k0 + 1;
+			float f = fk - k0;
+
+			for (int b = 0; b < 3; b++)
+			{
+				float col0 = colorbarIndex[k0][b] / 255.0;
+				float col1 = colorbarIndex[k1][b] / 255.0;
+				float col = (1 - f) * col0 + f * col1;
+				if (velocity >= upperbound)
+					col = 1;
+				else if (velocity <= lowerbound)
+					col = 0;
+				else
+					col = col;
+				data[2 - b] = (int)(255.0 * col);
+			}
+
+		}
+	}
+	return velocityFieldImg;
 }
