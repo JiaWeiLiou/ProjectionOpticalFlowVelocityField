@@ -120,7 +120,7 @@ Mat Colorbar::makeColorbar(int length, vector<string> index, string unit, int fl
 	int W = 0.04*length;		//色條寬度
 
 								/*查詢刻度字體長寬*/
-	int font_face = cv::FONT_HERSHEY_COMPLEX;
+	int font_face = cv::FONT_HERSHEY_SIMPLEX;
 	double font_scale = length / 1400.0;			//待修改
 	int thickness = ceil(length / 1200.0);
 	int baseline;					//基線高度
@@ -197,7 +197,7 @@ Mat Colorbar::makeColorbar(int flag)
 	int W = 0.04*length;		//色條寬度
 
 								/*查詢刻度字體長寬*/
-	int font_face = cv::FONT_HERSHEY_COMPLEX;
+	int font_face = cv::FONT_HERSHEY_SIMPLEX;
 	double font_scale = length / 1400.0;			//待修改
 	int thickness = ceil(length / 1200.0);
 	int baseline;					//基線高度
@@ -222,7 +222,8 @@ Mat Colorbar::makeColorbar(int flag)
 	if (flag == 0)
 	{
 		/*指定色條長寬*/
-		colorbarImg.create(length, W + 1.2*indexx, CV_8UC3);
+		Mat temp(length, W + 1.2*indexx, CV_8UC3, Scalar(255, 255, 255));
+		temp.copyTo(colorbarImg);
 		/*將色條複製至指定區域*/
 		Mat colorbarlocation = colorbarImg(Rect(0, (length - L) / 2, colorbarColorColor.cols, colorbarColorColor.rows));
 		colorbarColorColor.copyTo(colorbarlocation);
@@ -243,7 +244,8 @@ Mat Colorbar::makeColorbar(int flag)
 	else
 	{
 		/*指定色條長寬*/
-		colorbarImg.create(W + 2 * indexy, length, CV_8UC3);
+		Mat temp(W + 2 * indexy, length, CV_8UC3, Scalar(255,255,255));
+		temp.copyTo(colorbarImg);
 		/*將色條複製至指定區域*/
 		Mat colorbarlocation = colorbarImg(Rect((length - L) / 2, 0, colorbarColorColor.cols, colorbarColorColor.rows));
 		colorbarColorColor.copyTo(colorbarlocation);
