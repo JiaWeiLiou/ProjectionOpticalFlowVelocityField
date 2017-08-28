@@ -146,6 +146,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Colorbar.cpp" />
+    <ClCompile Include="ProjectionOpticalFlowVelocityField.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Colorbar.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
